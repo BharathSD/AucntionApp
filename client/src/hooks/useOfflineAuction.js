@@ -18,6 +18,24 @@ const A = {
 }
 
 function buildInitialState(saved) {
+  // If a live runtime state was previously persisted, restore it fully
+  if (saved._runtime) {
+    const r = saved._runtime
+    return {
+      config: saved.config,
+      teams: saved.teams,
+      players: saved.players,
+      queue: r.queue,
+      currentIdx: r.currentIdx,
+      currentPrice: r.currentPrice,
+      leadingTeamId: r.leadingTeamId,
+      bids: r.bids || [],
+      status: r.status,
+      timerLeft: saved.config.timerEnabled ? saved.config.timerSeconds : null,
+      paused: false,
+      secondRound: r.secondRound || false,
+    }
+  }
   return {
     config: saved.config,
     teams: saved.teams,
@@ -186,8 +204,17 @@ export function useOfflineAuction() {
       ...current,
       teams: state.teams,
       players: state.players,
+      _runtime: {
+        queue: state.queue,
+        currentIdx: state.currentIdx,
+        currentPrice: state.currentPrice,
+        leadingTeamId: state.leadingTeamId,
+        bids: state.bids,
+        status: state.status,
+        secondRound: state.secondRound,
+      },
     }))
-  }, [state.teams, state.players])
+  }, [state.teams, state.players, state.queue, state.currentIdx, state.currentPrice, state.leadingTeamId, state.bids, state.status, state.secondRound])
 
   // Timer tick
   useEffect(() => {
