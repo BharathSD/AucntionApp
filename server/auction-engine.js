@@ -33,9 +33,12 @@ function makeRoom(config) {
 
 function createRoom(roomCode, auctionData) {
   const room = makeRoom(auctionData.config)
-  room.teams = auctionData.teams.map(t => ({ ...t, budget: auctionData.config.pointsPerTeam, spent: 0, players: [] }))
-  room.players = auctionData.players.map(p => ({ ...p, status: 'pending', soldTo: null, soldPrice: null }))
-  room.queue = room.players.map((_, i) => i)
+  // Preserve team budgets/rosters from setup (pre-allocations already applied)
+  room.teams = auctionData.teams.map(t => ({ ...t }))
+  // Preserve player statuses — pre-allocated players are already 'sold'
+  room.players = auctionData.players.map(p => ({ ...p }))
+  // Queue only contains pending (not pre-allocated) players
+  room.queue = room.players.reduce((acc, p, i) => p.status === 'pending' ? [...acc, i] : acc, [])
   rooms.set(roomCode, room)
   return room
 }
@@ -151,8 +154,8 @@ function placeBid(roomCode, teamId, io) {
   const team = room.teams.find(t => t.id === teamId)
   if (!team) return { error: 'Team not found' }
 
-  const maxPlayers = room.config.maxPlayersPerTeam
-  if (maxPlayers && team.players.length >= maxPlayers) return { error: 'Team roster is full' }
+  const maxPlayers = Number(room.config.maxPlayersPerTeam) || 0
+  if (maxPlayers > 0 && team.players.length >= maxPlayers) return { error: 'Team roster is full' }
 
   const newPrice = room.bids.length === 0
     ? room.currentPrice
@@ -194,6 +197,14 @@ function sellPlayer(roomCode, io) {
 
   room.players[playerIdx] = { ...room.players[playerIdx], status: 'sold', soldTo: room.leadingTeamId, soldPrice: room.currentPrice }
   room.status = 'sold'
+
+  // Auto-finish if all teams have full rosters
+  const maxPlayers = Number(room.config.maxPlayersPerTeam) || 0
+  if (maxPlayers > 0 && room.teams.every(t => t.players.length >= maxPlayers)) {
+    room.status = 'finished'
+    io.to(roomCode).emit('auction:finished', publicState(room))
+    return publicState(room)
+  }
 
   io.to(roomCode).emit('auction:sold', publicState(room))
   return publicState(room)
