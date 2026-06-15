@@ -61,7 +61,6 @@ export default function CaptainBidding() {
     ? (state.currentPrice ?? 0)
     : (state.currentPrice ?? 0) + (config.bidIncrement ?? 0)
   const canBid = status === 'running' && !state.paused && myTeam && myTeam.budget >= nextBidPrice && !isLeading
-    && !(config.maxPlayersPerTeam && myTeam.players && myTeam.players.length >= config.maxPlayersPerTeam)
 
   const handleBid = () => {
     if (!canBid) return
@@ -175,8 +174,7 @@ export default function CaptainBidding() {
                 >
                   {bidFlash === 'ok' ? '✓ Bid placed!' :
                    bidFlash === 'late' ? 'Too late!' :                   isLeading ? '🔥 You\'re leading!' :                   canBid ? `BID ${nextBidPrice} pts` :
-                   myTeam && myTeam.budget < nextBidPrice ? 'Budget too low' :
-                   config.maxPlayersPerTeam && myTeam?.players?.length >= config.maxPlayersPerTeam ? '🚫 Roster Full' : 'Waiting…'}
+                   myTeam && myTeam.budget < nextBidPrice ? 'Budget too low' : 'Waiting…'}
                 </button>
               )}
             </>
