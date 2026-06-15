@@ -159,15 +159,24 @@ export default function OfflineAuction() {
                           className={`rounded-xl py-3 px-4 font-bold text-sm transition-all ${
                             canBid
                               ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                              : state.leadingTeamId === team.id
-                                ? 'bg-blue-900 text-blue-300 cursor-not-allowed ring-2 ring-blue-500'
-                                : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                              : rosterFull
+                                ? 'bg-red-950 text-red-400 cursor-not-allowed ring-2 ring-red-700'
+                                : state.leadingTeamId === team.id
+                                  ? 'bg-blue-900 text-blue-300 cursor-not-allowed ring-2 ring-blue-500'
+                                  : 'bg-gray-800 text-gray-600 cursor-not-allowed'
                           }`}
                         >
                           <span className="block truncate">{team.name}</span>
-                          <span className="block text-xs font-normal mt-1 opacity-70">
-                            {state.leadingTeamId === team.id ? '🔥 Leading' : rosterFull ? '🚫 Roster Full' : `${team.budget} pts left`}
-                          </span>
+                          {rosterFull ? (
+                            <span className="block text-xs font-normal mt-1">🚫 Roster Full</span>
+                          ) : state.leadingTeamId === team.id ? (
+                            <span className="block text-xs font-normal mt-1">🔥 Leading</span>
+                          ) : (
+                            <>
+                              <span className="block text-xs font-normal mt-1 text-gray-400">{team.budget} pts left</span>
+                              <span className="block text-xs font-normal text-gray-500">After bid: {team.budget - nextPrice} pts</span>
+                            </>
+                          )}
                         </button>
                       )
                     })}

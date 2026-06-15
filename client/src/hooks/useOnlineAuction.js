@@ -11,6 +11,7 @@ function reducer(state, action) {
         currentPrice: action.payload.price,
         leadingTeamId: action.payload.teamId,
         timerLeft: action.payload.timerLeft ?? state.timerLeft,
+        bids: [{ teamId: action.payload.teamId, price: action.payload.price, ts: Date.now() }, ...state.bids],
       }
     case 'TIMER_TICK':
       return { ...state, timerLeft: action.payload.timerLeft }
