@@ -10,6 +10,8 @@ const DEFAULT_CONFIG = {
   timerEnabled: true,
   timerSeconds: 15,
   minBidBase: 10,
+  maxPlayersPerTeam: 11,
+  randomizeOrder: false,
 }
 
 export default function Setup() {
@@ -27,6 +29,8 @@ export default function Setup() {
   const [players, setPlayers] = useState([])
   const [newPlayer, setNewPlayer] = useState({ name: '', role: 'Batsman', basePrice: '' })
   const [csvError, setCsvError] = useState('')
+  const [preAllocations, setPreAllocations] = useState([]) // [{playerId, teamId, price}]
+  const [retainSearch, setRetainSearch] = useState('')
   const fileRef = useRef()
 
   /* ---------- helpers ---------- */
@@ -79,13 +83,20 @@ export default function Setup() {
     const auctionData = {
       mode,
       config,
-      teams: teams.map(t => ({
-        ...t,
-        budget: config.pointsPerTeam,
-        spent: 0,
-        players: [],
-      })),
-      players: players.map(p => ({ ...p, status: 'unsold', soldTo: null, soldPrice: null })),
+      teams: teams.map(t => {
+        const myAllocs = preAllocations.filter(a => a.teamId === t.id)
+        const prePlayers = myAllocs.map(a => {
+          const p = players.find(pl => pl.id === a.playerId)
+          return p ? { ...p, soldPrice: Number(a.price), status: 'sold', soldTo: t.id } : null
+        }).filter(Boolean)
+        const spent = myAllocs.reduce((s, a) => s + Number(a.price), 0)
+        return { ...t, budget: config.pointsPerTeam - spent, spent, players: prePlayers }
+      }),
+      players: players.map(p => {
+        const alloc = preAllocations.find(a => a.playerId === p.id)
+        if (alloc) return { ...p, status: 'sold', soldTo: alloc.teamId, soldPrice: Number(alloc.price) }
+        return { ...p, status: 'pending', soldTo: null, soldPrice: null }
+      }),
       roomCode: mode === 'online' ? Math.random().toString(36).slice(2, 8).toUpperCase() : null,
       createdAt: Date.now(),
     }
@@ -108,7 +119,7 @@ export default function Setup() {
 
         {/* Step tabs */}
         <div className="flex gap-1 mb-8 bg-gray-900 rounded-xl p-1">
-          {[['config','⚙️ Config'], ['teams','👕 Teams'], ['players','🏃 Players'], ['review','✅ Review']].map(([s, label]) => (
+          {[['config','⚙️ Config'], ['teams','👕 Teams'], ['players','🏃 Players'], ['preallocate','📌 Retain'], ['review','✅ Review']].map(([s, label]) => (
             <button
               key={s}
               onClick={() => setStep(s)}
@@ -141,6 +152,14 @@ export default function Setup() {
               <input type="number" min={1} value={config.minBidBase}
                 onChange={e => handleConfigChange('minBidBase', e.target.value)}
                 className="input-field" />
+            </Field>
+            <Field label="Player Order">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={config.randomizeOrder}
+                  onChange={e => handleConfigChange('randomizeOrder', e.target.checked)}
+                  className="w-5 h-5 rounded" />
+                <span className="text-sm text-gray-300">Randomize player auction order</span>
+              </label>
             </Field>
             <Field label="Timer Mode">
               <label className="flex items-center gap-3 cursor-pointer">
@@ -251,7 +270,86 @@ export default function Setup() {
 
             <div className="flex justify-between">
               <button onClick={() => setStep('teams')} className="btn-secondary">← Back</button>
-              <button onClick={() => setStep('review')} disabled={!players.length} className="btn-primary disabled:opacity-40">Next: Review →</button>
+              <button onClick={() => setStep('preallocate')} disabled={!players.length} className="btn-primary disabled:opacity-40">Next: Retain →</button>
+            </div>
+          </div>
+        )}
+
+        {/* --- Step: Pre-allocate --- */}
+        {step === 'preallocate' && (
+          <div className="space-y-4">
+            <p className="text-gray-400 text-sm">Optionally assign retained/pre-allocated players to teams before the auction. These players won't go to auction.</p>
+            {players.length === 0 && <p className="text-gray-500 italic text-sm">No players added yet.</p>}
+            {players.length > 0 && (
+              <input
+                type="text"
+                placeholder="Search players…"
+                value={retainSearch}
+                onChange={e => setRetainSearch(e.target.value)}
+                className="input-field"
+              />
+            )}
+            <div className="space-y-2">
+              {players
+                .filter(p => p.name.toLowerCase().includes(retainSearch.toLowerCase()) ||
+                             p.role.toLowerCase().includes(retainSearch.toLowerCase()) ||
+                             preAllocations.some(a => a.playerId === p.id)) // always show retained
+                .map(p => {
+                const alloc = preAllocations.find(a => a.playerId === p.id)
+                return (
+                  <div key={p.id} className="bg-gray-800 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-sm">{p.name}</span>
+                      <span className="ml-2 text-xs text-gray-400">{p.role} • Base: {p.basePrice}</span>
+                    </div>
+                    {alloc ? (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <select
+                          value={alloc.teamId}
+                          onChange={e => setPreAllocations(prev => prev.map(a => a.playerId === p.id ? { ...a, teamId: e.target.value } : a))}
+                          className="input-field w-36 text-xs py-1"
+                        >
+                          {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <input
+                          type="number" min={0} placeholder="Price"
+                          value={alloc.price}
+                          onChange={e => setPreAllocations(prev => prev.map(a => a.playerId === p.id ? { ...a, price: e.target.value } : a))}
+                          className="input-field w-24 text-xs py-1"
+                        />
+                        <button
+                          onClick={() => setPreAllocations(prev => prev.filter(a => a.playerId !== p.id))}
+                          className="text-red-400 hover:text-red-300 text-lg leading-none px-1"
+                        >×</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setPreAllocations(prev => [...prev, { playerId: p.id, teamId: teams[0]?.id, price: p.basePrice }])}
+                        className="text-xs bg-blue-800 hover:bg-blue-700 px-3 py-1 rounded-lg shrink-0"
+                      >
+                        + Retain
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {preAllocations.length > 0 && (
+              <div className="bg-gray-900 rounded-xl p-3 text-xs text-gray-400">
+                <p className="font-semibold text-gray-300 mb-1">{preAllocations.length} player{preAllocations.length !== 1 ? 's' : ''} retained</p>
+                {teams.map(t => {
+                  const tAllocs = preAllocations.filter(a => a.teamId === t.id)
+                  if (!tAllocs.length) return null
+                  const totalCost = tAllocs.reduce((s, a) => s + Number(a.price || 0), 0)
+                  return (
+                    <p key={t.id}>{t.name}: {tAllocs.length} player{tAllocs.length !== 1 ? 's' : ''} — {totalCost} pts spent</p>
+                  )
+                })}
+              </div>
+            )}
+            <div className="flex justify-between">
+              <button onClick={() => setStep('players')} className="btn-secondary">← Back</button>
+              <button onClick={() => setStep('review')} className="btn-primary">Next: Review →</button>
             </div>
           </div>
         )}
@@ -264,6 +362,7 @@ export default function Setup() {
               <StatCard label="Points per team" value={config.pointsPerTeam} />
               <StatCard label="Bid increment" value={config.bidIncrement} />
               <StatCard label="Players" value={players.length} />
+              <StatCard label="Retained" value={preAllocations.length} />
               <StatCard label="Timer" value={config.timerEnabled ? `${config.timerSeconds}s` : 'Manual'} />
               <StatCard label="Mode" value={mode === 'offline' ? 'Offline' : 'Online'} />
             </div>

@@ -138,6 +138,34 @@ export default function CaptainBidding() {
                 {!leadingTeam && status === 'running' && <p className="text-gray-500 text-sm mt-2">No bids yet — be first!</p>}
               </div>
 
+              {/* Budget info */}
+              {myTeam && status === 'running' && (
+                <div className="w-full max-w-xs bg-gray-800 rounded-2xl px-5 py-3 text-sm">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-gray-400">Available budget</span>
+                    <span className="font-bold text-white">{myTeam.budget} pts</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-gray-400">Next bid costs</span>
+                    <span className="font-bold text-yellow-400">{nextBidPrice} pts</span>
+                  </div>
+                  <div className="flex justify-between border-t border-gray-700 pt-2">
+                    <span className="text-gray-400">Budget after bid</span>
+                    <span className={`font-bold ${myTeam.budget - nextBidPrice >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {myTeam.budget - nextBidPrice} pts
+                    </span>
+                  </div>
+                  {config.maxPlayersPerTeam && (
+                    <div className="flex justify-between border-t border-gray-700 pt-2 mt-2">
+                      <span className="text-gray-400">Roster</span>
+                      <span className={`font-bold ${myTeam.players?.length >= config.maxPlayersPerTeam ? 'text-red-400' : 'text-gray-300'}`}>
+                        {myTeam.players?.length ?? 0} / {config.maxPlayersPerTeam}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Timer */}
               {config.timerEnabled && status === 'running' && (
                 <div className={`text-4xl font-bold ${timerLeft <= 5 ? 'text-red-400 animate-pulse' : 'text-gray-400'}`}>
@@ -173,7 +201,10 @@ export default function CaptainBidding() {
                   }`}
                 >
                   {bidFlash === 'ok' ? '✓ Bid placed!' :
-                   bidFlash === 'late' ? 'Too late!' :                   isLeading ? '🔥 You\'re leading!' :                   canBid ? `BID ${nextBidPrice} pts` :
+                   bidFlash === 'late' ? 'Too late!' :
+                   isLeading ? '🔥 You\'re leading!' :
+                   config.maxPlayersPerTeam && myTeam?.players?.length >= config.maxPlayersPerTeam ? '🚫 Roster Full' :
+                   canBid ? `BID ${nextBidPrice} pts` :
                    myTeam && myTeam.budget < nextBidPrice ? 'Budget too low' : 'Waiting…'}
                 </button>
               )}

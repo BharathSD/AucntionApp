@@ -40,7 +40,15 @@ function buildInitialState(saved) {
     config: saved.config,
     teams: saved.teams,
     // queue: indices into players array (unsold/pending)
-    queue: saved.players.map((_, i) => i),
+    queue: (() => {
+      const q = saved.players.reduce((acc, p, i) => p.status === 'pending' ? [...acc, i] : acc, [])
+      if (saved.config.randomizeOrder) {
+        for (let i = q.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));[q[i], q[j]] = [q[j], q[i]]
+        }
+      }
+      return q
+    })(),
     players: saved.players,
     currentIdx: 0,       // index into queue
     currentPrice: null,
@@ -111,6 +119,8 @@ function reducer(state, action) {
         : state.currentPrice + state.config.bidIncrement
       if (team.budget < newPrice) return state // not enough budget
       if (state.status !== 'running' || state.paused) return state
+      const maxPlayers = Number(state.config.maxPlayersPerTeam) || 0
+      if (maxPlayers > 0 && team.players.length >= maxPlayers) return state // roster full
       return {
         ...state,
         currentPrice: newPrice,
@@ -145,11 +155,14 @@ function reducer(state, action) {
       const players = state.players.map((p, i) =>
         i === playerIdx ? { ...p, status: 'sold', soldTo: state.leadingTeamId, soldPrice: state.currentPrice } : p
       )
+      // Auto-finish if all teams have full rosters
+      const maxPlayers = Number(state.config.maxPlayersPerTeam) || 0
+      const allFull = maxPlayers > 0 && teams.every(t => t.players.length >= maxPlayers)
       return {
         ...state,
         teams,
         players,
-        status: 'sold',
+        status: allFull ? 'finished' : 'sold',
         paused: false,
       }
     }
