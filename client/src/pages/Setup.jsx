@@ -350,7 +350,7 @@ export default function Setup() {
                 className="input-field"
               />
             )}
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-800 rounded-xl p-2">
               {players
                 .filter(p => p.name.toLowerCase().includes(retainSearch.toLowerCase()) ||
                              p.role.toLowerCase().includes(retainSearch.toLowerCase()) ||
