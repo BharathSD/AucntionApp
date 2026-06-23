@@ -297,6 +297,12 @@ io.on('connection', (socket) => {
     engine.requeueUnsold(currentRoom, makeIoProxy(currentRoom))
   })
 
+  // Admin: auto-assign unsold players
+  socket.on('admin:autoAssignUnsold', () => {
+    if (!isAdmin || !currentRoom) return
+    engine.autoAssignUnsold(currentRoom, makeIoProxy(currentRoom))
+  })
+
   // Disconnect
   socket.on('disconnect', () => {
     if (currentRoom && currentTeamId) {

@@ -1,11 +1,15 @@
 import { useNavigate } from 'react-router-dom'
-import { loadAuctionState, clearAuctionState } from '../hooks/useAuctionStorage'
+import { loadAuctionState, loadOnlineLiveSnapshot, clearAuctionState } from '../hooks/useAuctionStorage'
 
 export default function Results() {
   const navigate = useNavigate()
   const saved = loadAuctionState()
 
-  if (!saved) {
+  const liveSnapshot = saved?.roomCode ? loadOnlineLiveSnapshot() : null
+  const liveState = liveSnapshot?.roomCode === saved?.roomCode ? liveSnapshot.state : null
+  const resultData = liveState ? { ...saved, ...liveState } : saved
+
+  if (!resultData) {
     return (
       <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
         <div className="text-center">
@@ -17,7 +21,7 @@ export default function Results() {
     )
   }
 
-  const { teams, players, config, mode } = saved
+  const { teams = [], players = [], config = {}, mode } = resultData
   const soldPlayers = players.filter(p => p.status === 'sold')
   const unsoldPlayers = players.filter(p => p.status !== 'sold')
 

@@ -16,6 +16,7 @@ const A = {
   RESUME: 'RESUME',
   REQUEUE_UNSOLD: 'REQUEUE_UNSOLD',
   FINISH: 'FINISH',
+  AUTO_ASSIGN: 'AUTO_ASSIGN',
 }
 
 function buildInitialState(saved) {
@@ -212,6 +213,59 @@ function reducer(state, action) {
     case A.FINISH:
       return { ...state, status: 'finished' }
 
+    case A.AUTO_ASSIGN: {
+      // Get all unsold players
+      const unsoldPlayers = state.players
+        .map((p, i) => ({ ...p, idx: i }))
+        .filter(p => p.status === 'unsold')
+      
+      if (unsoldPlayers.length === 0) return state // Nothing to assign
+      
+      const maxPlayers = Number(state.config.maxPlayersPerTeam) || 0
+      
+      // Shuffle unsold players for random assignment
+      const shuffled = [...unsoldPlayers]
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      
+      // Assign players to teams with available spots
+      let updatedTeams = state.teams.map(t => ({ ...t }))
+      let updatedPlayers = state.players.map(p => ({ ...p }))
+      
+      shuffled.forEach(unsoldPlayer => {
+        // Find teams with available roster spots, prioritize teams with fewer players
+        const availableTeams = updatedTeams
+          .filter(t => maxPlayers <= 0 || t.players.length < maxPlayers)
+          .sort((a, b) => a.players.length - b.players.length)
+        
+        if (availableTeams.length > 0) {
+          const assignedTeam = availableTeams[0]
+          // Assign this player to the team
+          const playerWithPrice = { ...unsoldPlayer, soldPrice: unsoldPlayer.basePrice }
+          assignedTeam.players.push(playerWithPrice)
+          assignedTeam.budget -= unsoldPlayer.basePrice
+          assignedTeam.spent = (assignedTeam.spent || 0) + unsoldPlayer.basePrice
+          
+          // Update player status
+          updatedPlayers[unsoldPlayer.idx] = {
+            ...unsoldPlayer,
+            status: 'sold',
+            soldTo: assignedTeam.id,
+            soldPrice: unsoldPlayer.basePrice,
+          }
+        }
+      })
+      
+      return {
+        ...state,
+        teams: updatedTeams,
+        players: updatedPlayers,
+        status: 'finished',
+      }
+    }
+
     default:
       return state
   }
@@ -272,6 +326,7 @@ export function useOfflineAuction() {
   const resume = useCallback(() => dispatch({ type: A.RESUME }), [])
   const requeueUnsold = useCallback(() => dispatch({ type: A.REQUEUE_UNSOLD }), [])
   const finishAuction = useCallback(() => dispatch({ type: A.FINISH }), [])
+  const autoAssignUnsold = useCallback(() => dispatch({ type: A.AUTO_ASSIGN }), [])
 
   const currentPlayer = state.queue[state.currentIdx] !== undefined
     ? state.players[state.queue[state.currentIdx]]
@@ -292,5 +347,6 @@ export function useOfflineAuction() {
     resume,
     requeueUnsold,
     finishAuction,
+    autoAssignUnsold,
   }
 }

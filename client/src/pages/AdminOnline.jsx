@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   loadAuctionState,
+  updateAuctionState,
   saveOnlineLiveSnapshot,
   loadOnlineLiveSnapshot,
   clearOnlineLiveSnapshot,
@@ -51,7 +52,7 @@ export default function AdminOnline() {
 
   const {
     state, currentPlayer, leadingTeam,
-    adminNextPlayer, adminUndoBid, adminFinish, adminSold, adminUnsold, adminRequeueUnsold, adminKickTeam, adminPause, adminResume,
+    adminNextPlayer, adminUndoBid, adminFinish, adminSold, adminUnsold, adminRequeueUnsold, adminKickTeam, adminPause, adminResume, adminAutoAssignUnsold,
   } = useOnlineAuction({ roomCode, role: 'admin', teamId: null })
 
   // Auto-save live state on every meaningful change
@@ -60,6 +61,21 @@ export default function AdminOnline() {
     if (state.status === 'finished') { clearOnlineLiveSnapshot(); return }
     saveOnlineLiveSnapshot({ roomCode, state, savedAt: Date.now() })
   }, [state, roomCode])
+
+  // Keep the main saved auction payload in sync with live online progress.
+  // Results/export reads this storage key, so it must reflect latest sold players.
+  useEffect(() => {
+    if (!roomCode || !state.status || state.status === 'idle') return
+    updateAuctionState(current => {
+      if (!current) return current
+      return {
+        ...current,
+        teams: state.teams,
+        players: state.players,
+        config: { ...current.config, ...state.config },
+      }
+    })
+  }, [roomCode, state.status, state.teams, state.players, state.config])
 
   // Flash disconnect alert when a captain drops mid-auction
   const prevConnectedRef = React.useRef(state.connectedTeamIds)
@@ -112,7 +128,12 @@ export default function AdminOnline() {
         <p className="text-gray-400">{soldCount} of {totalPlayers} players sold</p>
         <div className="flex gap-4">
           {state.players.some(p => p.status === 'unsold') && (
-            <button onClick={adminRequeueUnsold} className="btn-secondary">Re-auction unsold</button>
+            <>
+              <button onClick={adminAutoAssignUnsold} className="bg-purple-700 hover:bg-purple-600 text-white font-bold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-purple-900 transition-all hover:scale-105 cursor-pointer">
+                🎲 Auto-Assign Remaining
+              </button>
+              <button onClick={adminRequeueUnsold} className="btn-secondary">Re-auction unsold</button>
+            </>
           )}
           <button onClick={() => navigate('/results')} className="animate-pulse-ring bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-blue-900 transition-all hover:scale-105 cursor-pointer">
             View Results →

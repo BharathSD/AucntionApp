@@ -17,7 +17,7 @@ export default function OfflineAuction() {
   const [expandedTeamId, setExpandedTeamId] = useState(null)
   const {
     state, currentPlayer, leadingTeam,
-    startAuction, recordBid, undoBid, markSold, markUnsold, nextPlayer, pause, resume, requeueUnsold, finishAuction,
+    startAuction, recordBid, undoBid, markSold, markUnsold, nextPlayer, pause, resume, requeueUnsold, finishAuction, autoAssignUnsold,
   } = useOfflineAuction()
 
   if (!saved) {
@@ -44,7 +44,12 @@ export default function OfflineAuction() {
         <p className="text-gray-400">{soldCount} of {totalPlayers} players sold</p>
         <div className="flex gap-4">
           {state.players.some(p => p.status === 'unsold') && (
-            <button onClick={requeueUnsold} className="btn-secondary">Re-auction unsold players</button>
+            <>
+              <button onClick={autoAssignUnsold} className="bg-purple-700 hover:bg-purple-600 text-white font-bold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-purple-900 transition-all hover:scale-105 cursor-pointer">
+                🎲 Auto-Assign Remaining
+              </button>
+              <button onClick={requeueUnsold} className="btn-secondary">Re-auction unsold players</button>
+            </>
           )}
           <button onClick={() => navigate('/results')} className="animate-pulse-ring bg-blue-600 hover:bg-blue-500 text-white font-bold text-lg px-8 py-4 rounded-2xl shadow-lg shadow-blue-900 transition-all hover:scale-105 cursor-pointer">
             View Results →

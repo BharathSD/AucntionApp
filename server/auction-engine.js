@@ -349,6 +349,54 @@ function requeueUnsold(roomCode, io) {
   return publicState(room)
 }
 
+function autoAssignUnsold(roomCode, io) {
+  const room = getRoom(roomCode)
+  if (!room) return { error: 'Room not found' }
+
+  // Get all unsold players
+  const unsoldIdxs = room.players.reduce((acc, p, i) => p.status === 'unsold' ? [...acc, i] : acc, [])
+  if (!unsoldIdxs.length) return { error: 'No unsold players' }
+
+  const maxPlayers = Number(room.config.maxPlayersPerTeam) || 0
+
+  // Shuffle unsold indices for random assignment
+  const shuffled = [...unsoldIdxs]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  // Assign players to teams with available spots
+  shuffled.forEach(playerIdx => {
+    const unsoldPlayer = room.players[playerIdx]
+    
+    // Find teams with available roster spots, prioritize teams with fewer players
+    const availableTeams = room.teams
+      .filter(t => maxPlayers <= 0 || t.players.length < maxPlayers)
+      .sort((a, b) => a.players.length - b.players.length)
+    
+    if (availableTeams.length > 0) {
+      const assignedTeam = availableTeams[0]
+      // Assign this player to the team
+      const playerWithPrice = { ...unsoldPlayer, soldPrice: unsoldPlayer.basePrice }
+      assignedTeam.players.push(playerWithPrice)
+      assignedTeam.budget -= unsoldPlayer.basePrice
+      assignedTeam.spent = (assignedTeam.spent || 0) + unsoldPlayer.basePrice
+      
+      // Update player status
+      room.players[playerIdx] = {
+        ...unsoldPlayer,
+        status: 'sold',
+        soldTo: assignedTeam.id,
+        soldPrice: unsoldPlayer.basePrice,
+      }
+    }
+  })
+
+  io.to(roomCode).emit('auction:stateUpdate', publicState(room))
+  return publicState(room)
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 
 function startTimer(roomCode, room, io) {
@@ -418,6 +466,7 @@ module.exports = {
   resumeAuction,
   finishAuction,
   requeueUnsold,
+  autoAssignUnsold,
   restoreRoom,
   publicState,
   viewerState,
