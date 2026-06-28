@@ -43,6 +43,7 @@ function makeRoom(config) {
     timerHandle: null,
     secondRound: false,
     paused: false,
+    soldHistory: [],    // stack of sold actions for undo
     connectedCaptains: new Map(), // socketId -> teamId
     // Session tracking: teamId -> { socketId, disconnectedAt (ms) | null }
     captainSessions: new Map(),
@@ -226,7 +227,18 @@ function sellPlayer(roomCode, io) {
   clearTimer(room)
 
   const playerIdx = room.queue[room.currentIdx]
+  const playerBefore = { ...room.players[playerIdx] }
   const team = room.teams.find(t => t.id === room.leadingTeamId)
+
+  room.soldHistory.push({
+    playerIdx,
+    playerId: room.players[playerIdx].id,
+    teamId: room.leadingTeamId,
+    soldPrice: room.currentPrice,
+    currentIdx: room.currentIdx,
+    playerBefore,
+  })
+
   team.budget -= room.currentPrice
   team.spent = (team.spent || 0) + room.currentPrice
   team.players.push({ ...room.players[playerIdx], soldPrice: room.currentPrice })
@@ -243,6 +255,92 @@ function sellPlayer(roomCode, io) {
   }
 
   io.to(roomCode).emit('auction:sold', publicState(room))
+  return publicState(room)
+}
+
+function undoSoldPlayer(roomCode, io) {
+  const room = getRoom(roomCode)
+  if (!room) return { error: 'Room not found' }
+  if (!room.soldHistory.length) return { error: 'No sold player to undo' }
+
+  clearTimer(room)
+  const lastSold = room.soldHistory.pop()
+  const team = room.teams.find(t => t.id === lastSold.teamId)
+  if (!team) return { error: 'Winning team not found' }
+
+  // Remove the most recently awarded player from that team roster.
+  if (team.players.length > 0) {
+    const lastIdx = team.players.length - 1
+    if (team.players[lastIdx]?.id === lastSold.playerId) {
+      team.players.pop()
+    } else {
+      const fallbackIdx = team.players.findLastIndex(p => p.id === lastSold.playerId)
+      if (fallbackIdx >= 0) team.players.splice(fallbackIdx, 1)
+    }
+  }
+
+  team.budget += Number(lastSold.soldPrice) || 0
+  team.spent = Math.max(0, (Number(team.spent) || 0) - (Number(lastSold.soldPrice) || 0))
+
+  room.players[lastSold.playerIdx] = {
+    ...lastSold.playerBefore,
+    status: 'unsold',
+    soldTo: null,
+    soldPrice: null,
+  }
+  room.currentIdx = lastSold.currentIdx
+  room.currentPrice = room.players[lastSold.playerIdx].basePrice
+  room.leadingTeamId = null
+  room.bids = []
+  room.status = 'unsold'
+  room.paused = false
+  room.timerLeft = room.config.timerEnabled ? room.config.timerSeconds : room.timerLeft
+
+  io.to(roomCode).emit('auction:unsold', publicState(room))
+  return publicState(room)
+}
+
+function reopenSoldPlayer(roomCode, io) {
+  const room = getRoom(roomCode)
+  if (!room) return { error: 'Room not found' }
+  if (!room.soldHistory.length) return { error: 'No sold player to reopen' }
+
+  clearTimer(room)
+  const lastSold = room.soldHistory.pop()
+  const team = room.teams.find(t => t.id === lastSold.teamId)
+  if (!team) return { error: 'Winning team not found' }
+
+  // Remove this player from the winner roster and refund budget.
+  if (team.players.length > 0) {
+    const lastIdx = team.players.length - 1
+    if (team.players[lastIdx]?.id === lastSold.playerId) {
+      team.players.pop()
+    } else {
+      const fallbackIdx = team.players.findLastIndex(p => p.id === lastSold.playerId)
+      if (fallbackIdx >= 0) team.players.splice(fallbackIdx, 1)
+    }
+  }
+
+  team.budget += Number(lastSold.soldPrice) || 0
+  team.spent = Math.max(0, (Number(team.spent) || 0) - (Number(lastSold.soldPrice) || 0))
+
+  room.players[lastSold.playerIdx] = {
+    ...lastSold.playerBefore,
+    status: 'pending',
+    soldTo: null,
+    soldPrice: null,
+  }
+  room.currentIdx = lastSold.currentIdx
+  room.currentPrice = Number(lastSold.soldPrice) || room.players[lastSold.playerIdx].basePrice
+  room.leadingTeamId = lastSold.teamId
+  room.bids = [{ teamId: lastSold.teamId, price: Number(lastSold.soldPrice) || room.currentPrice, ts: Date.now() }]
+  room.status = 'running'
+  room.paused = false
+  room.timerLeft = room.config.timerEnabled ? room.config.timerSeconds : room.timerLeft
+
+  if (room.config.timerEnabled) startTimer(roomCode, room, io)
+
+  io.to(roomCode).emit('auction:stateUpdate', publicState(room))
   return publicState(room)
 }
 
@@ -327,6 +425,7 @@ function restoreRoom(roomCode, snapshot, originalSetup) {
   room.status = snapshot.status
   room.timerLeft = null  // timer does not auto-resume; admin proceeds manually
   room.secondRound = snapshot.secondRound || false
+  room.soldHistory = snapshot.soldHistory || []
 
   rooms.set(roomCode, room)
   return room
@@ -431,6 +530,7 @@ function publicState(room) {
     bids: room.bids.slice(0, 50),
     status: room.status,    paused: room.paused,    timerLeft: room.timerLeft,
     secondRound: room.secondRound,
+    canUndoSold: room.soldHistory.length > 0,
     connectedTeamIds: [...room.connectedCaptains.values()],
   }
 }
@@ -461,6 +561,8 @@ module.exports = {
   placeBid,
   undoBid,
   sellPlayer,
+  reopenSoldPlayer,
+  undoSoldPlayer,
   unsellPlayer,
   pauseAuction,
   resumeAuction,

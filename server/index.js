@@ -252,6 +252,18 @@ io.on('connection', (socket) => {
     engine.sellPlayer(currentRoom, makeIoProxy(currentRoom))
   })
 
+  // Admin: undo last sold player
+  socket.on('admin:undoSold', () => {
+    if (!isAdmin || !currentRoom) return
+    engine.undoSoldPlayer(currentRoom, makeIoProxy(currentRoom))
+  })
+
+  // Admin: reopen last sold player for bidding
+  socket.on('admin:reopenSold', () => {
+    if (!isAdmin || !currentRoom) return
+    engine.reopenSoldPlayer(currentRoom, makeIoProxy(currentRoom))
+  })
+
   // Admin: mark unsold
   socket.on('admin:unsold', () => {
     if (!isAdmin || !currentRoom) return

@@ -52,7 +52,7 @@ export default function AdminOnline() {
 
   const {
     state, currentPlayer, leadingTeam,
-    adminNextPlayer, adminUndoBid, adminFinish, adminSold, adminUnsold, adminRequeueUnsold, adminKickTeam, adminPause, adminResume, adminAutoAssignUnsold,
+    adminNextPlayer, adminUndoBid, adminFinish, adminSold, adminReopenSold, adminUndoSold, adminUnsold, adminRequeueUnsold, adminKickTeam, adminPause, adminResume, adminAutoAssignUnsold,
   } = useOnlineAuction({ roomCode, role: 'admin', teamId: null })
 
   // Auto-save live state on every meaningful change
@@ -126,6 +126,16 @@ export default function AdminOnline() {
         <div className="text-6xl">🏆</div>
         <h2 className="text-3xl font-bold">Auction Complete!</h2>
         <p className="text-gray-400">{soldCount} of {totalPlayers} players sold</p>
+        {state.canUndoSold && (
+          <div className="flex gap-2">
+            <button onClick={() => { if (window.confirm('Reopen bidding for the last sold player? This will remove the player from the team and restore the winning bid.')) adminReopenSold() }} className="bg-blue-700 hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-xl text-sm">
+              ↩ Reopen Last Sold
+            </button>
+            <button onClick={() => { if (window.confirm('Move the last sold player to unsold? This will remove the player from the team and refund the sale.')) adminUndoSold() }} className="bg-yellow-700 hover:bg-yellow-600 text-white font-bold px-4 py-2 rounded-xl text-sm">
+              ↩ Last Sold to Unsold
+            </button>
+          </div>
+        )}
         <div className="flex gap-4">
           {state.players.some(p => p.status === 'unsold') && (
             <>
@@ -336,6 +346,22 @@ export default function AdminOnline() {
 
               {(status === 'sold' || status === 'unsold') && (
                 <div className="flex flex-col items-center gap-2">
+                  {status === 'sold' && state.canUndoSold && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { if (window.confirm('Reopen bidding for this sold player? This will remove the player from the team and restore the winning bid.')) adminReopenSold() }}
+                        className="bg-blue-700 hover:bg-blue-600 text-white rounded-xl py-2 px-4 font-bold text-sm"
+                      >
+                        ↩ Reopen Bidding
+                      </button>
+                      <button
+                        onClick={() => { if (window.confirm('Move this sold player to unsold? This will remove the player from the team and refund the sale.')) adminUndoSold() }}
+                        className="bg-yellow-700 hover:bg-yellow-600 text-white rounded-xl py-2 px-4 font-bold text-sm"
+                      >
+                        ↩ To Unsold
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={adminNextPlayer}
                     disabled={state.connectedTeamIds.length < totalTeams}

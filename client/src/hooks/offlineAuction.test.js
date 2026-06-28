@@ -50,6 +50,7 @@ function runningState(config, teams, players, currentIdx = 0) {
     timerLeft: config.timerEnabled ? config.timerSeconds : null,
     paused: false,
     secondRound: false,
+    soldHistory: [],
   }
 }
 
@@ -316,6 +317,42 @@ describe('SOLD', () => {
     const state = runningState(makeConfig(), makeTeams(), makePlayers([100]))
     const next = reducer(state, { type: 'SOLD' })
     expect(next).toBe(state)
+  })
+})
+
+// ─── REOPEN_SOLD / SOLD_TO_UNSOLD ───────────────────────────
+
+describe('post-sold rollback actions', () => {
+  it('REOPEN_SOLD removes player from team and resumes bidding', () => {
+    const s0 = runningState(makeConfig(), makeTeams(), makePlayers([100, 200]))
+    const s1 = reducer(s0, { type: 'BID', teamId: 'team1' })
+    const s2 = reducer(s1, { type: 'SOLD' })
+    const s3 = reducer(s2, { type: 'REOPEN_SOLD' })
+    const team1 = s3.teams.find(t => t.id === 'team1')
+
+    expect(team1.budget).toBe(1000)
+    expect(team1.spent).toBe(0)
+    expect(team1.players).toHaveLength(0)
+    expect(s3.players[0].status).toBe('pending')
+    expect(s3.status).toBe('running')
+    expect(s3.leadingTeamId).toBe('team1')
+    expect(s3.currentPrice).toBe(100)
+  })
+
+  it('SOLD_TO_UNSOLD removes player from team and marks unsold', () => {
+    const s0 = runningState(makeConfig(), makeTeams(), makePlayers([100, 200]))
+    const s1 = reducer(s0, { type: 'BID', teamId: 'team1' })
+    const s2 = reducer(s1, { type: 'SOLD' })
+    const s3 = reducer(s2, { type: 'SOLD_TO_UNSOLD' })
+    const team1 = s3.teams.find(t => t.id === 'team1')
+
+    expect(team1.budget).toBe(1000)
+    expect(team1.spent).toBe(0)
+    expect(team1.players).toHaveLength(0)
+    expect(s3.players[0].status).toBe('unsold')
+    expect(s3.status).toBe('unsold')
+    expect(s3.leadingTeamId).toBeNull()
+    expect(s3.bids).toHaveLength(0)
   })
 })
 

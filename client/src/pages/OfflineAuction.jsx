@@ -17,7 +17,7 @@ export default function OfflineAuction() {
   const [expandedTeamId, setExpandedTeamId] = useState(null)
   const {
     state, currentPlayer, leadingTeam,
-    startAuction, recordBid, undoBid, markSold, markUnsold, nextPlayer, pause, resume, requeueUnsold, finishAuction, autoAssignUnsold,
+    startAuction, recordBid, undoBid, markSold, reopenSold, soldToUnsold, markUnsold, nextPlayer, pause, resume, requeueUnsold, finishAuction, autoAssignUnsold,
   } = useOfflineAuction()
 
   if (!saved) {
@@ -211,9 +211,21 @@ export default function OfflineAuction() {
               )}
 
               {(status === 'sold' || status === 'unsold') && (
-                <button onClick={nextPlayer} className="btn-primary text-lg px-8 py-3">
-                  Next Player →
-                </button>
+                <div className="flex flex-col items-center gap-2">
+                  {status === 'sold' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => { if (window.confirm('Reopen bidding for this sold player? This will remove the player from the team and restore the winning bid.')) reopenSold() }} className="bg-blue-700 hover:bg-blue-600 text-white rounded-xl py-2 px-4 font-bold text-sm">
+                        ↩ Reopen Bidding
+                      </button>
+                      <button onClick={() => { if (window.confirm('Move this sold player to unsold? This will remove the player from the team and refund the sale.')) soldToUnsold() }} className="bg-yellow-700 hover:bg-yellow-600 text-white rounded-xl py-2 px-4 font-bold text-sm">
+                        ↩ To Unsold
+                      </button>
+                    </div>
+                  )}
+                  <button onClick={nextPlayer} className="btn-primary text-lg px-8 py-3">
+                    Next Player →
+                  </button>
+                </div>
               )}
             </>
           )}
