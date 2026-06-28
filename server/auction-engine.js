@@ -229,6 +229,7 @@ function sellPlayer(roomCode, io) {
   const playerIdx = room.queue[room.currentIdx]
   const playerBefore = { ...room.players[playerIdx] }
   const team = room.teams.find(t => t.id === room.leadingTeamId)
+  const soldAt = Date.now()
 
   room.soldHistory.push({
     playerIdx,
@@ -241,9 +242,9 @@ function sellPlayer(roomCode, io) {
 
   team.budget -= room.currentPrice
   team.spent = (team.spent || 0) + room.currentPrice
-  team.players.push({ ...room.players[playerIdx], soldPrice: room.currentPrice })
+  team.players.push({ ...room.players[playerIdx], soldPrice: room.currentPrice, soldAt })
 
-  room.players[playerIdx] = { ...room.players[playerIdx], status: 'sold', soldTo: room.leadingTeamId, soldPrice: room.currentPrice }
+  room.players[playerIdx] = { ...room.players[playerIdx], status: 'sold', soldTo: room.leadingTeamId, soldPrice: room.currentPrice, soldAt }
   room.status = 'sold'
 
   // Auto-finish if all teams have full rosters
@@ -287,6 +288,7 @@ function undoSoldPlayer(roomCode, io) {
     status: 'unsold',
     soldTo: null,
     soldPrice: null,
+    soldAt: null,
   }
   room.currentIdx = lastSold.currentIdx
   room.currentPrice = room.players[lastSold.playerIdx].basePrice
@@ -329,6 +331,7 @@ function reopenSoldPlayer(roomCode, io) {
     status: 'pending',
     soldTo: null,
     soldPrice: null,
+    soldAt: null,
   }
   room.currentIdx = lastSold.currentIdx
   room.currentPrice = Number(lastSold.soldPrice) || room.players[lastSold.playerIdx].basePrice
@@ -405,6 +408,7 @@ function returnSoldPlayerToQueue(roomCode, playerId, io) {
     status: 'pending',
     soldTo: null,
     soldPrice: null,
+    soldAt: null,
   }
   room.soldHistory = room.soldHistory.filter(entry => entry.playerId !== playerId)
 
@@ -516,8 +520,9 @@ function autoAssignUnsold(roomCode, io) {
     
     if (availableTeams.length > 0) {
       const assignedTeam = availableTeams[0]
+      const soldAt = Date.now()
       // Assign this player to the team
-      const playerWithPrice = { ...unsoldPlayer, soldPrice: unsoldPlayer.basePrice }
+      const playerWithPrice = { ...unsoldPlayer, soldPrice: unsoldPlayer.basePrice, soldAt }
       assignedTeam.players.push(playerWithPrice)
       assignedTeam.budget -= unsoldPlayer.basePrice
       assignedTeam.spent = (assignedTeam.spent || 0) + unsoldPlayer.basePrice
@@ -528,6 +533,7 @@ function autoAssignUnsold(roomCode, io) {
         status: 'sold',
         soldTo: assignedTeam.id,
         soldPrice: unsoldPlayer.basePrice,
+        soldAt,
       }
     }
   })

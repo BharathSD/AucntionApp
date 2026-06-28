@@ -144,7 +144,7 @@ export default function AdminOnline() {
                 <p className="text-sm text-gray-500">No players</p>
               ) : (
                 <div className="space-y-2">
-                  {team.players.map(player => (
+                  {[...team.players].reverse().map(player => (
                     <div key={player.id} className="flex items-center justify-between gap-3 text-sm">
                       <span className="text-gray-300 truncate">{player.name}</span>
                       <button
@@ -463,7 +463,7 @@ export default function AdminOnline() {
                           <p className="text-xs text-gray-600 py-1 italic">No players yet</p>
                         ) : (
                           <div className="space-y-0.5 mt-1">
-                            {team.players.map((p, i) => (
+                            {[...team.players].reverse().map((p, i) => (
                               <div key={i} className="flex items-center justify-between gap-2 text-xs">
                                 <span className="text-gray-300 truncate">{p.name}</span>
                                 <div className="flex items-center gap-2 shrink-0">
