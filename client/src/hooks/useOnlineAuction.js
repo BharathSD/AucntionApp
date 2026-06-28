@@ -96,6 +96,7 @@ export function useOnlineAuction({ roomCode, role, teamId }) {
   const adminSold = useCallback(() => socketRef.current?.emit('admin:sold'), [])
   const adminReopenSold = useCallback(() => socketRef.current?.emit('admin:reopenSold'), [])
   const adminUndoSold = useCallback(() => socketRef.current?.emit('admin:undoSold'), [])
+  const adminReturnSoldToQueue = useCallback((playerId) => socketRef.current?.emit('admin:returnSoldToQueue', { playerId }), [])
   const adminUnsold = useCallback(() => socketRef.current?.emit('admin:unsold'), [])
   const adminRequeueUnsold = useCallback(() => socketRef.current?.emit('admin:requeueUnsold'), [])
   const adminAutoAssignUnsold = useCallback(() => socketRef.current?.emit('admin:autoAssignUnsold'), [])
@@ -120,6 +121,7 @@ export function useOnlineAuction({ roomCode, role, teamId }) {
     adminSold,
     adminReopenSold,
     adminUndoSold,
+    adminReturnSoldToQueue,
     adminUnsold,
     adminRequeueUnsold,
     adminAutoAssignUnsold,

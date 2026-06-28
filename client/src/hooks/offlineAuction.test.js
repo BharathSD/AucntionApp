@@ -354,6 +354,19 @@ describe('post-sold rollback actions', () => {
     expect(s3.leadingTeamId).toBeNull()
     expect(s3.bids).toHaveLength(0)
   })
+
+  it('RETURN_SOLD_TO_QUEUE refunds team and appends player to future queue', () => {
+    const s0 = runningState(makeConfig(), makeTeams(), makePlayers([100, 200, 300]))
+    const s1 = reducer(s0, { type: 'BID', teamId: 'team1' })
+    const s2 = reducer(s1, { type: 'SOLD' })
+    const s3 = reducer({ ...s2, currentIdx: 1, status: 'running' }, { type: 'RETURN_SOLD_TO_QUEUE', playerId: 'p1' })
+    const team1 = s3.teams.find(t => t.id === 'team1')
+
+    expect(team1.budget).toBe(1000)
+    expect(team1.players).toHaveLength(0)
+    expect(s3.players[0].status).toBe('pending')
+    expect(s3.queue.at(-1)).toBe(0)
+  })
 })
 
 // ─── UNSOLD ───────────────────────────────────────────────────

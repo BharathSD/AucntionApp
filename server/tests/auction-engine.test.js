@@ -380,6 +380,46 @@ describe('reopenSoldPlayer', () => {
   })
 })
 
+describe('returnSoldPlayerToQueue', () => {
+  beforeEach(() => {
+    setupRoom('RTQ01', makeConfig(), makeTeams(2, 1000), makePlayers([100, 200, 300]))
+    engine.startNextPlayer('RTQ01', io)
+    engine.placeBid('RTQ01', 'team1', io)
+    engine.sellPlayer('RTQ01', io)
+    engine.startNextPlayer('RTQ01', io)
+  })
+
+  it('refunds the team, removes player from roster, and appends player back to queue', () => {
+    engine.returnSoldPlayerToQueue('RTQ01', 'p1', io)
+    const room = engine.getRoom('RTQ01')
+    assert.equal(room.teams[0].budget, 1000)
+    assert.equal(room.teams[0].spent, 0)
+    assert.equal(room.teams[0].players.length, 0)
+    assert.equal(room.players[0].status, 'pending')
+    assert.equal(room.queue.at(-1), 0)
+  })
+
+  it('reopens a finished auction by setting status back to idle', () => {
+    setupRoom('RTQ02', makeConfig(), makeTeams(2, 1000), makePlayers([100]))
+    engine.startNextPlayer('RTQ02', io)
+    engine.placeBid('RTQ02', 'team1', io)
+    engine.sellPlayer('RTQ02', io)
+    engine.finishAuction('RTQ02', io)
+
+    engine.returnSoldPlayerToQueue('RTQ02', 'p1', io)
+    const room = engine.getRoom('RTQ02')
+    assert.equal(room.status, 'idle')
+    assert.equal(room.queue.at(-1), 0)
+  })
+
+  it('returns error for an unsold or unknown player', () => {
+    const unsold = engine.returnSoldPlayerToQueue('RTQ01', 'p2', io)
+    assert.ok(unsold.error)
+    const missing = engine.returnSoldPlayerToQueue('RTQ01', 'does-not-exist', io)
+    assert.ok(missing.error)
+  })
+})
+
 // ─── undoBid ──────────────────────────────────────────────────
 
 describe('undoBid', () => {

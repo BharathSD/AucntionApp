@@ -273,6 +273,12 @@ io.on('connection', (socket) => {
     engine.reopenSoldPlayer(currentRoom, makeIoProxy(currentRoom))
   })
 
+  // Admin: return any sold player to the queue for later re-auction
+  socket.on('admin:returnSoldToQueue', ({ playerId }) => {
+    if (!isAdmin || !currentRoom || !playerId) return
+    engine.returnSoldPlayerToQueue(currentRoom, playerId, makeIoProxy(currentRoom))
+  })
+
   // Admin: mark unsold
   socket.on('admin:unsold', () => {
     if (!isAdmin || !currentRoom) return

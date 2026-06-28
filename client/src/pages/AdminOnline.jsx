@@ -52,7 +52,7 @@ export default function AdminOnline() {
 
   const {
     state, currentPlayer, leadingTeam,
-    adminNextPlayer, adminUndoBid, adminFinish, adminSold, adminReopenSold, adminUndoSold, adminUnsold, adminRequeueUnsold, adminKickTeam, adminPause, adminResume, adminAutoAssignUnsold,
+    adminNextPlayer, adminUndoBid, adminFinish, adminSold, adminReopenSold, adminUndoSold, adminReturnSoldToQueue, adminUnsold, adminRequeueUnsold, adminKickTeam, adminPause, adminResume, adminAutoAssignUnsold,
   } = useOnlineAuction({ roomCode, role: 'admin', teamId: null })
 
   // Auto-save live state on every meaningful change
@@ -136,6 +136,30 @@ export default function AdminOnline() {
             </button>
           </div>
         )}
+        <div className="w-full max-w-2xl space-y-3">
+          {teams.map(team => (
+            <div key={team.id} className="bg-gray-900 rounded-xl p-4 text-left">
+              <p className="font-semibold mb-2">{team.name}</p>
+              {team.players.length === 0 ? (
+                <p className="text-sm text-gray-500">No players</p>
+              ) : (
+                <div className="space-y-2">
+                  {team.players.map(player => (
+                    <div key={player.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-gray-300 truncate">{player.name}</span>
+                      <button
+                        onClick={() => { if (window.confirm(`Return ${player.name} to the auction queue? This removes the player from ${team.name} and refunds the sale.`)) adminReturnSoldToQueue(player.id) }}
+                        className="text-cyan-300 border border-cyan-800 rounded px-2 py-1 hover:text-white"
+                      >
+                        ↺ Return to Queue
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
         <div className="flex gap-4">
           {state.players.some(p => p.status === 'unsold') && (
             <>
@@ -440,9 +464,22 @@ export default function AdminOnline() {
                         ) : (
                           <div className="space-y-0.5 mt-1">
                             {team.players.map((p, i) => (
-                              <div key={i} className="flex justify-between text-xs">
+                              <div key={i} className="flex items-center justify-between gap-2 text-xs">
                                 <span className="text-gray-300 truncate">{p.name}</span>
-                                <span className="text-yellow-400 font-mono ml-2 shrink-0">{p.soldPrice}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-yellow-400 font-mono">{p.soldPrice}</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (window.confirm(`Return ${p.name} to the auction queue? This removes the player from ${team.name} and refunds the sale.`)) {
+                                        adminReturnSoldToQueue(p.id)
+                                      }
+                                    }}
+                                    className="text-cyan-300 hover:text-white border border-cyan-900 rounded px-1.5 py-0.5"
+                                  >
+                                    ↺
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>

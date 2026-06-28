@@ -10,6 +10,7 @@ const A = {
   SOLD: 'SOLD',
   REOPEN_SOLD: 'REOPEN_SOLD',
   SOLD_TO_UNSOLD: 'SOLD_TO_UNSOLD',
+  RETURN_SOLD_TO_QUEUE: 'RETURN_SOLD_TO_QUEUE',
   UNSOLD: 'UNSOLD',
   NEXT_PLAYER: 'NEXT_PLAYER',
   TICK: 'TICK',
@@ -279,6 +280,48 @@ function reducer(state, action) {
       }
     }
 
+    case A.RETURN_SOLD_TO_QUEUE: {
+      const { playerId } = action
+      const playerIdx = state.players.findIndex(p => p.id === playerId)
+      if (playerIdx < 0) return state
+
+      const player = state.players[playerIdx]
+      if (player.status !== 'sold' || !player.soldTo) return state
+
+      const teams = state.teams.map(t => {
+        if (t.id !== player.soldTo) return t
+        const roster = [...(t.players || [])]
+        const idx = roster.findIndex(p => p.id === playerId)
+        if (idx >= 0) roster.splice(idx, 1)
+        const soldPrice = Number(player.soldPrice) || 0
+        return {
+          ...t,
+          players: roster,
+          budget: t.budget + soldPrice,
+          spent: Math.max(0, (Number(t.spent) || 0) - soldPrice),
+        }
+      })
+
+      const players = state.players.map((p, i) =>
+        i === playerIdx
+          ? { ...p, status: 'pending', soldTo: null, soldPrice: null }
+          : p
+      )
+
+      const queue = state.queue.slice(state.currentIdx + 1).includes(playerIdx)
+        ? state.queue
+        : [...state.queue, playerIdx]
+
+      return {
+        ...state,
+        teams,
+        players,
+        queue,
+        status: state.status === 'finished' ? 'idle' : state.status,
+        soldHistory: state.soldHistory.filter(entry => entry.playerId !== playerId),
+      }
+    }
+
     case A.UNSOLD: {
       const playerIdx = state.queue[state.currentIdx]
       const players = state.players.map((p, i) =>
@@ -424,6 +467,7 @@ export function useOfflineAuction() {
   const markSold = useCallback(() => dispatch({ type: A.SOLD }), [])
   const reopenSold = useCallback(() => dispatch({ type: A.REOPEN_SOLD }), [])
   const soldToUnsold = useCallback(() => dispatch({ type: A.SOLD_TO_UNSOLD }), [])
+  const returnSoldToQueue = useCallback((playerId) => dispatch({ type: A.RETURN_SOLD_TO_QUEUE, playerId }), [])
   const markUnsold = useCallback(() => dispatch({ type: A.UNSOLD }), [])
   const nextPlayer = useCallback(() => dispatch({ type: A.NEXT_PLAYER, advance: true }), [])
   const pause = useCallback(() => dispatch({ type: A.PAUSE }), [])
@@ -447,6 +491,7 @@ export function useOfflineAuction() {
     markSold,
     reopenSold,
     soldToUnsold,
+    returnSoldToQueue,
     markUnsold,
     nextPlayer,
     pause,

@@ -380,6 +380,46 @@ function unsellPlayer(roomCode, io) {
   return publicState(room)
 }
 
+function returnSoldPlayerToQueue(roomCode, playerId, io) {
+  const room = getRoom(roomCode)
+  if (!room) return { error: 'Room not found' }
+
+  const playerIdx = room.players.findIndex(p => p.id === playerId)
+  if (playerIdx < 0) return { error: 'Player not found' }
+
+  const player = room.players[playerIdx]
+  if (player.status !== 'sold' || !player.soldTo) return { error: 'Player is not currently sold' }
+
+  const team = room.teams.find(t => t.id === player.soldTo)
+  if (!team) return { error: 'Winning team not found' }
+
+  const soldPrice = Number(player.soldPrice) || 0
+  const rosterIdx = team.players.findIndex(p => p.id === player.id)
+  if (rosterIdx >= 0) team.players.splice(rosterIdx, 1)
+
+  team.budget += soldPrice
+  team.spent = Math.max(0, (Number(team.spent) || 0) - soldPrice)
+
+  room.players[playerIdx] = {
+    ...player,
+    status: 'pending',
+    soldTo: null,
+    soldPrice: null,
+  }
+  room.soldHistory = room.soldHistory.filter(entry => entry.playerId !== playerId)
+
+  if (!room.queue.slice(room.currentIdx + 1).includes(playerIdx)) {
+    room.queue.push(playerIdx)
+  }
+
+  if (room.status === 'finished') {
+    room.status = 'idle'
+  }
+
+  io.to(roomCode).emit('auction:stateUpdate', publicState(room))
+  return publicState(room)
+}
+
 function pauseAuction(roomCode, io) {
   const room = getRoom(roomCode)
   if (!room || room.status !== 'running') return { error: 'Not running' }
@@ -564,6 +604,7 @@ module.exports = {
   reopenSoldPlayer,
   undoSoldPlayer,
   unsellPlayer,
+  returnSoldPlayerToQueue,
   pauseAuction,
   resumeAuction,
   finishAuction,
